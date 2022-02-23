@@ -8,7 +8,7 @@ int main(void)
 	for (i = 0; i < strlen(buf); i++)
 		if (buf[i] >= 'A' && buf[i] <= 'Z')
 			buf[i] ^= 0x20;
-	printf(buf);
+	vfprintf(buf);
 	exit(EXIT_SUCCESS);
 	return EXIT_FAILURE;
 }
