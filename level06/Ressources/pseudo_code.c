@@ -20,7 +20,6 @@ int auth(char *username, unsigned int serial)
 
 	username[strcspn(username, "\n")] = '\0';
 	len = strnlen(username, 32);
-	deathrays;
 	if (len < 6)
 		return 1;
 	if (ptrace(PTRACE_TRACEME, 0, 1, 0) == -1)
