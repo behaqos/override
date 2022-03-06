@@ -1,4 +1,6 @@
 
+Alex:
+
 1. See info functions:
 	0x08048748  auth
 2. Disas auth and convert to c:
@@ -43,6 +45,7 @@ Authenticated!
 $ cat /home/users/level07/.pass
 GbcPDRgsFK77LNnnuh7QyFYA2942Gp8yKj9KrWD8
 
+Bekhruz:
 
 После раскодировки примерного кода мы обнаруживаем, что код получает аргументы username & serial,
 затем отправляет в функцию auth.
@@ -119,3 +122,6 @@ testing - потому что под этот логин testing
 -> Enter Serial: 6231043
 Authenticated!
 $ whoami 
+level07
+$ cat /home/users/level07/.pass
+GbcPDRgsFK77LNnnuh7QyFYA2942Gp8yKj9KrWD8
