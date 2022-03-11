@@ -1,0 +1,136 @@
+Password:
+RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+Partial RELRO   Canary found      NX enabled    No PIE          No RPATH   No RUNPATH   /home/users/level03/level03
+
+Partial RELRO  - есть защита от перемещения
+Canary found - есть канареечная защита
+NX enabled - Стек не может быть выполнен
+No PIE - нет рандомизации базового адреса
+No RPATH  - нет жестких путей загрузки библиотек
+No RUNPATH - нет жестких путей загрузки библиотек
+
+смотрим на все строчки которые есть в файле
+level03@OverRide:~$ readelf  -p .rodata level03
+
+String dump of section '.rodata':
+  [     8]  %u
+  [     b]  Congratulations!
+  [    1c]  /bin/sh
+  [    25]  Invalid Password
+  [    38]  J<0x88>^D^Hu<0x87>^D^H<0x85><0x87>^D^H<0x95><0x87>^D^H<0xa5><0x87>^D^H<0xb5><0x87>^D^H<0xc5><0x87>^D^H<0xd5><0x87>^D^H<0xe2><0x87>^D^H<0xef><0x87>^D^HJ
+  [    b4]  *^I^Ilevel03^I^I**
+  [    c3]  Password:
+  [    cd]  %d
+
+>> gdb ./level03
+>> disas decrypt
+
+   0x08048673 <+19>:    movl   $0x757c7d51,-0x1d(%ebp) -> u|}Q
+   0x0804867a <+26>:    movl   $0x67667360,-0x19(%ebp)
+   0x08048681 <+33>:    movl   $0x7b66737e,-0x15(%ebp)
+   0x08048688 <+40>:    movl   $0x33617c7d,-0x11(%ebp)
+
+Переводим hex в символы ascii:
+
+   python -c 'print "757c7d51".decode("hex")[::-1]' -> Q}|u
+   python -c 'print "67667360".decode("hex")[::-1]' -> `sfg
+   python -c 'print "7b66737e".decode("hex")[::-1]' -> ~sf{
+   python -c 'print "33617c7d".decode("hex")[::-1]' -> }|a3
+
+
+в нормальном виде Q}|u`sfg~sf{}|a3
+
+начинаем разбор файла
+
+>> objdump -D ./level03
+
+функция main вызывает тест test(введенное число, 322424845)
+
+0x080488ca <+112>:   movl   $0x1337d00d,0x4(%esp)
+
+в функции test:
+                                        mov    %edx,%ecx
+ 8048755:       29 c1                   sub    %eax,%ecx
+ 8048757:       89 c8                   mov    %ecx,%eax
+ 8048759:       89 45 f4                mov    %eax,-0xc(%ebp)
+
+ SUB РАЗНОСТЬ, ЧИСЛО
+С помощью этой команды можно из РАЗНОСТИ вычесть ЧИСЛО. Результат помещается в РАЗНОСТЬ.
+
+MOV ПРИЁМНИК, ИСТОЧНИК
+
+С помощью этой команды можно переместить значение из ИСТОЧНИКА в ПРИЁМНИК.
+То есть по сути команда MOV копирует содержимое ИСТОЧНИКА и помещает это содержимое в ПРИЁМНИК.
+
+
+ 0x0804875c <+21>:    cmpl   $0x15,-0xc(%ebp)
+ 0x15(hex) =  21(dec)
+Команда cmpl сравнивает содержимое регистра общего назначения (GPR) RA с
+ содержимым GPR RB в виде целых чисел без знака и устанавливает один из битов в поле BF регистра условий .
+
+
+ void test(int input, int nb)
+{
+    nb = nb - input;
+    if (nb <= 21)
+    {
+        decrypt(nb);
+        return;
+    }
+    decrypt(rand());
+    return;
+}
+
+в функции присутствует применение постоянной маски
+
+ 8048694:       31 c0                   xor    %eax,%eax
+
+^  Побитовое исключающее ИЛИ (xor):
+
+https://ru.wikipedia.org/wiki/Исключающее_«или»
+
+void decrypt(int input)
+{
+
+    char buf[17] = "Q}|u`sfg~sf{}|a3";
+
+    size_t len = strlen(buf); /* ebp-0x24 */
+
+    int i = 0; /* ebp-0x28 */
+    while (i < len)
+    {
+
+        buf[i] = buf[i] ^ input;
+        i++;
+    }
+    if (strncmp(buf, "Congratulations!", 17) == 0)
+    {
+        system("/bin/sh");
+    } else {
+        puts("\nInvalid Password");
+    }
+    return;
+}
+
+Необходимо подбор такого значения input, чтобы при инвертирование по маске получить строку
+"Congratulations!"
+
+Теперь мы просто находим такой ключ, что Q ^ x = C,
+Q = 81
+C = 67
+
+Делаем обратное преобразование в калькуляторе:
+81 xor 67 = 18
+т
+322424845 - 18 = 322424827
+Password:322424827
+
+$ cd ../level04
+$ cat .pass
+kgv3tkEb9h2mLkRsPkXRfc2mHbjMxQzvb2FrgKkf
+
+su level04
+Password:
+RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+Partial RELRO   No canary found   NX disabled   No PIE          No RPATH   No RUNPATH   /home/users/level04/level04
+level04@OverRide:~$

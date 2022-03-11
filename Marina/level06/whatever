@@ -1,0 +1,148 @@
+RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+Partial RELRO   Canary found      NX enabled    No PIE          No RPATH   No RUNPATH   /home/users/level06/level06
+
+Partial RELRO  - есть защита от перемещения
+canary found- есть канареечная защита
+NX enabled - Стек не может быть выполнен
+No PIE - нет рандомизации базового адреса
+No RPATH  - нет жестких путей загрузки библиотек
+No RUNPATH - нет жестких путей загрузки библиотек
+
+./level06
+***********************************
+*               level06           *
+***********************************
+-> Enter Login: gabshire
+***********************************
+***** NEW ACCOUNT DETECTED ********
+***********************************
+-> Enter Serial: 1234
+
+программа запросила логин и пароль и просто закрылась
+
+ltrace ./level06
+
+fgets(-> Enter Login: gabshire
+"gabshire\n", 32, 0xf7fcfac0)
+
+видим что логин считывается в 32 байтный массив
+
+printf("-> Enter Serial: ")                                                                        = 17
+__isoc99_scanf(0x8048a60, -10648, 0xf7fcfac0, 0x8048746, 60-> Enter Serial: 123
+)                                       = 1
+strcspn("gabshire\n", "\n")                                                                        = 8
+strnlen(-10644, 32, -10684, 0, -10600)                                                             = 8
+ptrace(0, 0, 1, 0, -10600)                                                                         = -1
+puts("\033[32m.--------------------------"....---------------------------.
+)                                                     = 35
+puts("\033[31m| !! TAMPERING DETECTED !! "...| !! TAMPERING DETECTED !!  |
+)                                                     = 35
+puts("\033[32m'--------------------------"...'---------------------------'
+)                                                     = 35
++++ exited (status 1) +++
+
+gdb ./level06
+(gdb) r
+Starting program: /home/users/level06/level06
+***********************************
+*               level06           *
+***********************************
+-> Enter Login: gabshire
+***********************************
+***** NEW ACCOUNT DETECTED ********
+***********************************
+-> Enter Serial: 123
+.---------------------------.
+| !! TAMPERING DETECTED !!  |
+'---------------------------'
+[Inferior 1 (process 4109) exited with code 01
+
+
+как видим при работе с ltrace или gdb программа просто завершает работу
+
+ 0x08048941 <+200>:   call   0x8048748 <auth>
+   0x08048946 <+205>:   test   %eax,%eax
+   0x08048948 <+207>:   jne    0x8048969 <main+240>
+   0x0804894a <+209>:   movl   $0x8048b52,(%esp)
+   0x08048951 <+216>:   call   0x8048590 <puts@plt>
+   0x08048956 <+221>:   movl   $0x8048b61,(%esp)
+   0x0804895d <+228>:   call   0x80485a0 <system@plt>
+   0x08048962 <+233>:   mov    $0x0,%eax
+   0x08048967 <+238>:   jmp    0x804896e <main+245>
+   0x08048969 <+240>:   mov    $0x1,%eax
+   0x0804896e <+245>:   mov    0x4c(%esp),%edx
+   0x08048972 <+249>:   xor    %gs:0x14,%edx
+   0x08048979 <+256>:   je     0x8048980 <main+263>
+   0x0804897b <+258>:   call   0x8048580 <__stack_chk_fail@plt>
+   0x08048980 <+263>:   leave
+   0x08048981 <+264>:   ret
+
+   если auth вернет 0 то запустится    system("/bin/sh");
+
+
+disas auth
+
+  /*
+    0x08048863 <+283>:	mov    eax,DWORD PTR [ebp+0xc]  ; input serial
+    0x08048866 <+286>:	cmp    eax,DWORD PTR [ebp-0x10] ; serial generated
+    0x08048869 <+289>:	je     0x8048872 <auth+298>
+    */
+    те сама программа посчитала ожидаемый хеш и сравнивает с ним введенный
+
+    if (serial != nb) {
+       return 1;
+    }
+    else {
+        return 0;
+    }
+
+Что бы найти интересующий нас пароль мы можем остановится когда система уже посчитала требуемый пароль.
+Проблема заключается в том что бы обойти проверку ptrace(0, 0, 1, 0, -10600)
+https://www.sourceware.org/gdb/onlinedocs/gdb/Set-Catchpoints.html
+
+для этого мы должны запустить
+gdb ./level06
+
+catch syscall ptrace
+commands 1
+set $eax=0
+continue
+end
+
+После этих манипуляций ptrace всегда будет возвращать 0
+
+ставим контрольную точку на интересующую нас позицию
+b *auth+286 // if (serial == a)
+
+запускаем программу )
+(gdb) r
+
+-> Enter Login: gabshire
+-> Enter Serial: 1234
+
+после срабатывания точки проверяем туда ли мы попали
+(gdb) x/x $ebp+0xc
+0xffffd634:     0x000004d2 = 1234 //то что мы ввели
+(gdb) x/x $ebp-0x10
+0xffffd618:     0x005f2163 = 6234467 // что от нас хочет система
+
+level06@OverRide:~$ ./level06
+***********************************
+*               level06           *
+***********************************
+-> Enter Login: gabshire
+***********************************
+***** NEW ACCOUNT DETECTED ********
+***********************************
+-> Enter Serial: 6234467
+Authenticated!
+$cat /home/users/level07/.pass
+gabshire: GbcPDRgsFK77LNnnuh7QyFYA2942Gp8yKj9KrWD8
+bcharity: GbcPDRgsFK77LNnnuh7QyFYA2942Gp8yKj9KrWD8
+[2]+  Stopped                 ./level06
+
+level06@OverRide:~$ su level07
+Password:
+RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+Partial RELRO   Canary found      NX disabled   No PIE          No RPATH   No RUNPATH   /home/users/level07/level07
+level07@OverRide:~$
