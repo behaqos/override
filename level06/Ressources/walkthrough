@@ -29,7 +29,7 @@ Continuing at 0x80487ed.
 Breakpoint 2, 0x08048866 in auth () than to find value of hash login which we had
 enter in Login.
 Register ebp - 0x10 help us to find our hash value than to pass it in serial
-(gdb) p *(int*)($ebp-0x10)
+(gdb) p *(int*)($ebp-0x10)	
 $1 = 6231043
 6. Use it:
 level06@OverRide:~$ ./level06
@@ -103,9 +103,9 @@ end
 Взлом:
 Делаем breakpoint на ptrace (чтобы не засёк отслеживание нашего процесса на gdb)
  и на сравнении значений if (serial != chk)
-	(gdb) b *0x080487b5
+	b *0x080487b5
 	Breakpoint 1 at 0x80487b5
-	(gdb) b *0x08048866
+	b *0x08048866
 	Breakpoint 2 at 0x8048866 
 для точек остановки и получения значения serial.
 
@@ -136,5 +136,5 @@ testing - потому что под этот логин testing
 Authenticated!
 $ whoami 
 level07
-$ cat /home/users/level07/.pass
+cat /home/users/level07/.pass
 GbcPDRgsFK77LNnnuh7QyFYA2942Gp8yKj9KrWD8

@@ -5,7 +5,7 @@ unsigned int get_unum(void)
 
   fflush(stdout);
   scanf("%u", value);
-  clear_stdin();
+  clear2_stdin();
   return value;
 }
 

