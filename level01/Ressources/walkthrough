@@ -7,7 +7,7 @@
 - verify_user_pass внутренняя функция
 
 В псевдокоде, переведённом через Cutter, мы видим, что значение user_name сравнивается с "dat_wil"
-level01@OverRide:~$ ./level01 dat_wil
+level01@OverRide:~$ ./level01
 ********* ADMIN LOGIN PROMPT *********
 Enter Username: dat_wil
 verifying username....
@@ -18,7 +18,7 @@ nope, incorrect password...
 
 Пароль со строкой admin не подходит.
 
-level01@OverRide:~$ ./level01 dat_wil
+level01@OverRide:~$ ./level01
 ********* ADMIN LOGIN PROMPT *********
 Enter Username: dat_wil
 verifying username....

